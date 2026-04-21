@@ -20,7 +20,7 @@ classifiers = [
     "Topic :: System :: Hardware",
 ]
 dependencies = [
-    "mcp>=0.9.0",
+    "mcp>=1.0.0",
     "pyserial>=3.5",
 ]
 

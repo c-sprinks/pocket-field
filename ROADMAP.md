@@ -38,16 +38,17 @@ Public, honest, subject to change. If a phase slips, the dates update here rathe
 
 ## Phase 3 — MCP server v0.1 (Cardputter backend only)
 
-**Target: 1 week after Phase 2.**
+**Status: core complete (2026-04-20). Runs against real hardware end-to-end.**
 
-- [ ] Python MCP server scaffolded with official `mcp` SDK
-- [ ] `Backend` abstract base class
-- [ ] `CardputterBackend` implementation (serial link + protocol v1)
-- [ ] `Proxmark3Backend` STUB that raises `NotImplementedError` — placeholder to lock the interface
-- [ ] Tools: `read_card()`, `device_info()`, `raw(command: str)`, `list_backends()`
-- [ ] Serial link with auto-reconnect, typed errors, command timeouts
-- [ ] Pytest coverage with mocked serial (no hardware required for CI)
-- [ ] Config snippets for Claude Desktop and Claude Code in docs
+- [x] Python MCP server with official `mcp` SDK (FastMCP, stdio transport)
+- [x] `Backend` abstract base class with typed `Capability` enum
+- [x] `CardputterBackend` implementation (pyserial + `ProtocolV1Client`)
+- [x] `Proxmark3Backend` stub raises `BackendUnavailableError` — interface locked for Phase 5
+- [x] Tools: `read_card()` (placeholder), `device_info()`, `raw(command, args)`, `list_backends()`
+- [x] `ProtocolV1Client` with typed errors, timeouts, streaming support
+- [x] Pytest coverage (24 tests) with mocked serial — no hardware required for CI
+- [x] Verified end-to-end: MCP client → pocket-field-mcp → firmware on /dev/ttyACM0
+- [x] Config snippets for Claude Desktop and Claude Code in [docs/getting-started.md](docs/getting-started.md)
 
 ## Phase 4 — v0.1.0 public release
 
