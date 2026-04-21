@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .base import Backend, BackendInfo, BackendUnavailable, Capability
+from .base import Backend, BackendInfo, BackendUnavailableError, Capability
 
 
 @dataclass
@@ -37,7 +37,7 @@ class Proxmark3Backend(Backend):
 
     def connect(self) -> None:
         # Phase 5: spawn pm3 subprocess, wait for READY prompt, verify firmware version.
-        raise BackendUnavailable(
+        raise BackendUnavailableError(
             "Proxmark3 backend not implemented yet — scheduled for v0.2 (see ROADMAP.md Phase 5)"
         )
 

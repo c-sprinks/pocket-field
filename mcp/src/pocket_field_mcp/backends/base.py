@@ -14,10 +14,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class Capability(str, Enum):
+class Capability(StrEnum):
     """What a backend can do. Used for routing decisions."""
 
     NFC_READ_13_56_MHZ = "nfc_read_13_56_mhz"
@@ -46,11 +46,11 @@ class BackendError(Exception):
     """Base class for backend errors."""
 
 
-class BackendUnavailable(BackendError):
+class BackendUnavailableError(BackendError):
     """Backend hardware is not currently connected."""
 
 
-class BackendTimeout(BackendError):
+class BackendTimeoutError(BackendError):
     """Backend took too long to respond."""
 
 
