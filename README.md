@@ -2,9 +2,13 @@
 
 **MCP server + firmware for driving access control hardware from an LLM.**
 
-Ask Claude — "read this access card, tell me the facility code and card number" — and get a real answer back from real hardware. Starts with the M5Stack Cardputter ADV; designed from day 1 to add more hardware backends (Proxmark3, contact smart card readers, etc.) behind the same MCP tool surface.
+Ask Claude — "what's connected?" or "read this access card" — and route the request through real firmware on real hardware. Starts with the M5Stack Cardputter ADV; designed from day 1 to add more hardware backends (Proxmark3, contact smart card readers, etc.) behind the same MCP tool surface.
 
-> **Status: pre-release / in development.** Nothing ships yet. Target first release: v0.1.0 with Cardputter + NFC card read. See [ROADMAP](ROADMAP.md).
+> **Current release: v0.1.0 (foundation) — 2026-04-20.**
+>
+> Protocol, firmware, MCP server, and Cardputter backend are live and verified
+> end-to-end. **NFC card reading is not implemented yet** — see [CHANGELOG](CHANGELOG.md)
+> for what works today and [ROADMAP](ROADMAP.md) for what's next.
 
 ---
 
@@ -35,22 +39,27 @@ This tool interacts with access control hardware. Use it only on systems you own
 
 ## Quickstart
 
-> Not usable yet. This section documents the target UX for v0.1.0.
-
 ```bash
-# 1. Flash firmware
+# 1. Flash firmware to a connected Cardputter ADV
 git clone https://github.com/c-sprinks/pocket-field.git
 cd pocket-field/firmware
-pio run -t upload
+pio run -e cardputter-adv -t upload
 
 # 2. Install MCP server
 cd ../mcp
-uv pip install -e .
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
 
 # 3. Register with Claude Desktop (config snippet in docs/getting-started.md)
 ```
 
-Then ask Claude: *"Read the card I just held up to the reader."*
+Then ask Claude: *"What's connected? What's the Cardputter's status?"* — Claude
+will call `list_backends` and `device_info`, open the serial port, negotiate
+protocol v1, and return live firmware data.
+
+Card reading is not supported in v0.1.0 — see [CHANGELOG](CHANGELOG.md) and
+[ROADMAP](ROADMAP.md).
 
 ## Documentation
 
