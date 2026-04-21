@@ -12,7 +12,7 @@ Public, honest, subject to change. If a phase slips, the dates update here rathe
 - [x] MIT license, contribution guide
 - [x] Public GitHub repo visible to community
 - [x] CI stubs (PlatformIO build + Python lint/typecheck/test)
-- [ ] Hardware validation spike: Cardputter ADV + PN532 I2C comms work on Evil-Cardputter ADV base (gate to Phase 1)
+- [x] Hardware validation spike (2026-04-20): firmware builds + flashes + boots on real Cardputter ADV; USB CDC works; protocol v1 validated end-to-end with system.version/help/status + proper error frames. PN532 integration deferred to Phase 2 (awaiting hardware).
 
 ## Phase 1 — Firmware foundation (Cardputter)
 
