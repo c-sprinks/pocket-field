@@ -1,34 +1,59 @@
 # Architecture
 
-This document describes *why* pocket-field is built the way it is. Code-level specifics live in [docs/protocol-v1.md](docs/protocol-v1.md) and module READMEs.
+This document describes *why* pocket-field is built the way it is. Code-level specifics live in [docs/protocol-v1.md](docs/protocol-v1.md), backend docs, and module READMEs.
 
 ## System diagram
 
 ```
-┌──────────────────────────┐       Claude API         ┌──────────────────┐
-│  LLM client              │ ◄──────────────────────► │  Anthropic cloud │
-│  (Claude Desktop,        │                          └──────────────────┘
-│   Claude Code, claude.ai │
-│   with remote MCP, etc.) │
-└─────────┬────────────────┘
-          │  MCP (JSON-RPC over stdio or HTTP)
-          ▼
-┌──────────────────────────┐
-│  pocket-field-mcp        │    Python, official MCP SDK, pyserial
-│  (local or on PocketPi)  │    Tools: read_card, device_info, raw
-└─────────┬────────────────┘
-          │  USB serial — 115200 baud, protocol v1
-          ▼
-┌──────────────────────────┐
-│  pocket-field-fw         │    C++/Arduino, fork of Evil-Cardputter ADV
-│  (Cardputter ADV)        │    Serial CLI + feature modules (NFC, …)
-└─────────┬────────────────┘
-          │  I2C (Grove)
-          ▼
-┌──────────────────────────┐
-│  PN532 NFC Unit          │    13.56 MHz NFC/RFID
-└──────────────────────────┘
+               ┌──────────────────────────────┐
+               │  LLM client                  │
+               │  (Claude Desktop, Claude Code│
+               │   claude.ai via remote MCP…) │
+               └──────────────┬───────────────┘
+                              │  MCP (JSON-RPC over stdio/HTTP)
+                              ▼
+               ┌──────────────────────────────┐
+               │  pocket-field-mcp            │   Python, official MCP SDK
+               │  Exposes tools:              │
+               │    read_card()               │
+               │    device_info()             │
+               │    raw(command: str)         │
+               │    list_backends()           │
+               └──────────────┬───────────────┘
+                              │  routes each tool call to the
+                              │  best available backend
+             ┌────────────────┼────────────────┐
+             ▼                ▼                ▼
+     ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+     │ Cardputter   │ │ Proxmark3    │ │ Future       │
+     │ backend      │ │ backend      │ │ backends     │
+     │ (v0.1)       │ │ (v0.3+)      │ │ …            │
+     └──────┬───────┘ └──────┬───────┘ └──────────────┘
+            │                │
+     ┌──────▼───────┐ ┌──────▼───────┐
+     │ Cardputter   │ │ Proxmark3    │
+     │ ADV + PN532  │ │ Easy / RDV4  │
+     │ USB serial   │ │ USB + pm3    │
+     └──────────────┘ └──────────────┘
 ```
+
+## Multi-backend design (the single most important decision)
+
+`pocket-field-mcp` is **not a Cardputter wrapper**. It's a control plane for access control hardware. The same MCP tool (e.g., `read_card()`) routes to whichever backend is currently available and best-suited for the task:
+
+| Task | Cardputter backend | Proxmark3 backend |
+|---|---|---|
+| Read MIFARE / iCLASS UID at 13.56 MHz | ✓ (via PN532 unit) | ✓ |
+| Read HID Prox at 125 kHz | ❌ | ✓ |
+| Deep RFID write/emulate/clone | ❌ | ✓ |
+| WiFi recon / BLE scan | ✓ | ❌ |
+| IR TX/RX | ✓ | ❌ |
+| HID keyboard / BadUSB | ✓ | ❌ |
+| Portable field UI (screen + keyboard) | ✓ | ❌ |
+
+**Claude chooses.** When the user says "read this card," the MCP server checks which backends are connected and which is best-suited, and either picks automatically or asks the user. Both backends can be connected at once.
+
+This is why v0.1 ships with only Cardputter but the code structure already has the `backends/` abstraction: adding Proxmark3 in Phase 3 is a new backend file, not a rewrite.
 
 ## Design decisions
 
@@ -38,7 +63,7 @@ Considered alternatives:
 - **MicroPython**: preferred user stack (Python), BUT unknown ADV keyboard chip support, slower real-time performance on ESP32-S3, smaller community for offensive-tooling drivers.
 - **ESP-IDF**: more power, steeper learning curve, no advantage for this project's scope.
 
-**Decision**: Arduino-on-PlatformIO. Same stack as every proven Cardputter ADV firmware (Evil-Cardputter ADV, Bruce, Porkchop), so we inherit all hardware work. Python stays at the MCP layer where it's a better fit.
+**Decision**: Arduino-on-PlatformIO. Same stack as every proven Cardputter ADV firmware (Evil-Cardputer ADV, Bruce, Porkchop), so we inherit all hardware work. Python stays at the MCP layer where it's a better fit.
 
 ### 2. Firmware base: fork Evil-Cardputter ADV
 
@@ -47,9 +72,9 @@ Considered alternatives:
 - **Fork Bruce**: largest feature surface, but a kitchen-sink codebase we'd fight against for narrow scope.
 - **Fork Porkchop**: WiFi-focused, not relevant to our access-control-first goals.
 
-**Decision**: Evil-Cardputter ADV. It was built specifically for the ADV variant's keyboard chip, has a clean codebase, and maps well to the "strip to essentials, add CLI" plan. We track upstream periodically; if it goes dormant, we carry on.
+**Decision**: Evil-Cardputter ADV. It was built specifically for the ADV variant's keyboard chip, has a clean codebase, and maps well to the "strip to essentials, add CLI" plan. Upstream uses Arduino IDE `.ino` files — we port the Cardputter target to PlatformIO as part of Phase 1. We track upstream periodically; if it goes dormant, we carry on.
 
-### 3. Transport: USB serial, plain text, versioned protocol
+### 3. Firmware ↔ MCP transport: USB serial, plain text, versioned protocol
 
 Considered alternatives:
 - **Protobuf/binary RPC** (like Flipper Zero): typed, efficient, BUT harder for LLMs to reason about and debug. [0xIvan's pi-flipper findings](https://blog.navcore.io/AI-Agents/Giving-a-Pi.dev-Agent-Hands-on-a-Flipper-Zero) confirm this empirically.
@@ -60,27 +85,33 @@ Considered alternatives:
 
 Full wire format in [docs/protocol-v1.md](docs/protocol-v1.md).
 
-### 4. Repo structure: monorepo
+### 4. Proxmark3 ↔ MCP transport: the `pm3` CLI over subprocess
 
-Firmware and MCP server ship together until there's a reason to split. For a v0.1 project with one maintainer, the friction of two repos outweighs the theoretical "clean separation" benefit.
+Considered alternatives:
+- **Protobuf/custom serial protocol to Proxmark3**: Proxmark3 already has a well-maintained `pm3` CLI with stable command syntax. Reinventing the wheel is silly.
+- **libpm3 native bindings**: possible but adds build complexity.
 
-Path forward if it grows: split `firmware/` and `mcp/` into separate repos with a shared `protocol/` repo.
+**Decision**: `pocket-field-mcp` spawns `pm3` as a subprocess and feeds it commands, parses output. Standard pattern for wrapping mature CLI tools. Implementation lands in Phase 3+.
 
-### 5. Protocol versioning
+### 5. Repo structure: monorepo
 
-Firmware reports its protocol version via the `version` command. MCP server refuses to operate against incompatible versions. Breaking changes to the wire format bump the major version (v1 → v2); additive changes bump the minor.
+Firmware and MCP server ship together until there's a reason to split. For an early-stage project with one maintainer, the friction of multiple repos outweighs the theoretical "clean separation" benefit.
 
-This is the single most important design decision. It lets each side iterate without a synchronized flag-day release.
+### 6. Protocol versioning (Cardputter backend)
 
-### 6. Error model
+Firmware reports its protocol version via the `system.version` command. MCP server refuses to operate against incompatible versions. Breaking changes bump the major version (v1 → v2); additive changes bump minor.
 
-The firmware returns **typed error codes** (numbers) plus human-readable messages. The MCP server translates error codes into structured exceptions. Rationale: LLMs reason better about "error: NFC_NO_TAG_DETECTED (code 42)" than "something didn't work."
+This is the single most important protocol-level decision. It lets each side iterate without a synchronized flag-day release.
 
-Error codes are catalogued in [docs/protocol-v1.md](docs/protocol-v1.md).
+### 7. Error model
 
-### 7. Scope discipline
+Backends return **typed error codes** (not free-form strings). The MCP server translates error codes into structured exceptions visible to the LLM. Rationale: LLMs reason better about "error: NFC_NO_TAG_DETECTED (code 42)" than "something didn't work."
 
-v0.1.0 ships **one** capability: NFC card read. Not WiFi, not IR, not SubGHz, not LoRa. This is deliberate — narrow ship > broken wide ship. Features grow in subsequent releases driven by:
+Cardputter error codes are catalogued in [docs/protocol-v1.md](docs/protocol-v1.md). Proxmark3 error translation lands with the Proxmark3 backend.
+
+### 8. Scope discipline
+
+v0.1.0 ships **one capability through one backend**: NFC card read via Cardputter + PN532. Not WiFi, not IR, not SubGHz, not LoRa, not Proxmark3. This is deliberate — narrow ship > broken wide ship. Features grow in subsequent releases driven by:
 1. Real use cases encountered by the maintainer
 2. Community demand via GitHub issues
 
@@ -94,15 +125,28 @@ See [ROADMAP.md](ROADMAP.md) for planned expansion.
 - Listens on USB serial at 115200 baud for protocol v1 commands
 - Dispatches commands to feature modules (NFC, system, …)
 - Returns structured responses
-- Never makes autonomous decisions — it only executes what the host asks
+- Never makes autonomous decisions — executes only what the host asks
 
 ### MCP server (`mcp/`)
 
-- Exposes firmware capabilities as MCP tools with typed schemas
-- Manages the serial connection (open, reconnect, timeout, disconnect)
-- Parses protocol v1 responses into MCP tool results
-- Validates requests before sending to firmware
-- Never hides firmware errors — surfaces them faithfully to the LLM
+- Exposes access control capabilities as MCP tools with typed schemas
+- Discovers and manages backends (Cardputter, Proxmark3, …)
+- Routes tool calls to the appropriate backend
+- Parses backend responses into MCP tool results
+- Validates requests before sending to backends
+- Never hides backend errors — surfaces them faithfully to the LLM
+
+### Cardputter backend (`mcp/.../backends/cardputter.py`)
+
+- Manages the Cardputter's USB serial connection (open, reconnect, timeout, disconnect)
+- Implements protocol v1 frame parsing
+- Translates between MCP tool args and firmware CLI commands
+
+### Proxmark3 backend (`mcp/.../backends/proxmark3.py`) — stub in v0.1, implemented Phase 3+
+
+- Spawns and manages the `pm3` CLI subprocess
+- Parses `pm3` output into structured results
+- Handles Proxmark3-specific quirks (standalone mode, firmware versioning)
 
 ### The LLM
 

@@ -1,25 +1,26 @@
 # pocket-field
 
-**LLM-native firmware + MCP server for the M5Stack Cardputter ADV.**
+**MCP server + firmware for driving access control hardware from an LLM.**
 
-Drive your Cardputter from Claude (or any MCP client) over USB serial. Ask in natural language — "read this access card, tell me the facility code and card number" — and get a real answer back from real hardware.
+Ask Claude — "read this access card, tell me the facility code and card number" — and get a real answer back from real hardware. Starts with the M5Stack Cardputter ADV; designed from day 1 to add more hardware backends (Proxmark3, contact smart card readers, etc.) behind the same MCP tool surface.
 
-> **Status: pre-release / in development.** Nothing ships yet. Target first release: v0.1.0 with NFC card read over MCP. See [ROADMAP](ROADMAP.md).
+> **Status: pre-release / in development.** Nothing ships yet. Target first release: v0.1.0 with Cardputter + NFC card read. See [ROADMAP](ROADMAP.md).
 
 ---
 
 ## What this is
 
-Two components in one monorepo:
+Three pieces in one monorepo:
 
 1. **`firmware/`** — C++/Arduino firmware for the M5Stack Cardputter ADV (ESP32-S3), forked from [Evil-Cardputer ADV](https://github.com/7h30th3r0n3/Evil-M5Project). Exposes a versioned text protocol over USB serial that an LLM can reliably parse.
-2. **`mcp/`** — Python MCP ([Model Context Protocol](https://modelcontextprotocol.io/)) server that wraps the firmware's serial CLI as Claude tools. Runs on any Linux host (laptop, Raspberry Pi) that can USB-connect to the Cardputter.
-
-The two talk over a **versioned text protocol** so they can evolve independently.
+2. **`mcp/`** — Python MCP ([Model Context Protocol](https://modelcontextprotocol.io/)) server that exposes access control tools to Claude. Supports **multiple hardware backends** — Cardputter today, Proxmark3 and others on the roadmap.
+3. **Versioned protocols** between components, so firmware and MCP server can ship independently.
 
 ## Who this is for
 
-Field technicians, pentesters, and hobbyists who already own a Cardputter ADV and want to drive it from an LLM instead of a menu. Not a replacement for Bruce, Porkchop, or Evil-Cardputter — a different philosophy: narrow scope, machine-readable, automation-first.
+Field technicians, pentesters, and hobbyists who work with access control hardware and want to drive it from an LLM instead of a GUI or menu. Particularly useful for **card enrollment, reader commissioning, and on-site diagnostics**.
+
+Not a replacement for Bruce, Porkchop, Evil-Cardputter, or the Proxmark3 client — a different philosophy: **one MCP tool surface across all your hardware**, machine-readable, automation-first.
 
 ## Authorized use
 
