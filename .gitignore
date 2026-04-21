@@ -18,6 +18,8 @@ env/
 *.egg
 dist/
 build/
+# Release artifacts (we regenerate these for each tag)
+/dist/
 
 # Testing
 .pytest_cache/
