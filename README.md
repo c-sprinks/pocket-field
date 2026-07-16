@@ -71,7 +71,7 @@ Card reading is not supported in v0.1.0 — see [CHANGELOG](CHANGELOG.md) and
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Issues and PRs welcome. Code of conduct applies.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Issues and PRs welcome.
 
 ## License
 
